@@ -8,6 +8,45 @@ import { apiClient } from '@/lib/api'
 type StyleType = 'educational' | 'storytelling' | 'explainer' | 'news'
 type DurationType = 30 | 60 | 90
 
+const topicSuggestions: Record<string, { icon: string; topics: string[] }> = {
+  'Science & Nature': {
+    icon: '🔬',
+    topics: [
+      'How black holes form and what happens at the event horizon',
+      'The secret life of deep ocean creatures in the midnight zone',
+      'How CRISPR gene editing is revolutionizing medicine',
+      'Why do volcanoes erupt? The geology beneath our feet',
+    ],
+  },
+  'History & Culture': {
+    icon: '🏛️',
+    topics: [
+      'The rise and fall of the Roman Empire in 60 seconds',
+      'How ancient Egyptians built the pyramids without modern tools',
+      'The history of coffee from Ethiopia to your morning cup',
+      'Silk Road: the trade route that connected civilizations',
+    ],
+  },
+  'Technology & AI': {
+    icon: '🤖',
+    topics: [
+      'How large language models like ChatGPT actually work',
+      'The evolution of smartphones from 2007 to today',
+      'Blockchain explained simply: beyond cryptocurrency',
+      'How self-driving cars see and navigate the world',
+    ],
+  },
+  'Health & Psychology': {
+    icon: '🧠',
+    topics: [
+      'Why do we dream? The neuroscience of sleep explained',
+      'How exercise physically changes your brain structure',
+      'The gut-brain connection: your second brain explained',
+      'What happens to your body during a 24-hour fast',
+    ],
+  },
+}
+
 // Helper to map API errors to user-friendly messages
 const friendlyError = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error)
@@ -65,6 +104,7 @@ export default function CreatePage() {
 
   const [topic, setTopic] = useState('')
   const [topicTouched, setTopicTouched] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
   const [style, setStyle] = useState<StyleType>('educational')
   const [duration, setDuration] = useState<DurationType>(30)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -310,6 +350,47 @@ export default function CreatePage() {
               Describe what you want your video to be about. Be specific or
               general—our AI adapts.
             </p>
+
+            {/* Subject Category Chips */}
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-2 mb-3">
+                {Object.entries(topicSuggestions).map(([category, { icon }]) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => setActiveCategory(activeCategory === category ? null : category)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                      activeCategory === category
+                        ? 'bg-primary-500 text-white'
+                        : 'bg-dark-surface border border-dark-border text-gray-300 hover:border-primary-500/50 hover:text-white'
+                    }`}
+                  >
+                    {icon} {category}
+                  </button>
+                ))}
+              </div>
+
+              {/* Suggestion Topics */}
+              {activeCategory && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                  {topicSuggestions[activeCategory].topics.map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => {
+                        setTopic(suggestion)
+                        setTopicTouched(true)
+                        setActiveCategory(null)
+                      }}
+                      className="text-left p-3 text-sm text-primary-300 bg-primary-500/5 border border-primary-500/20 rounded-lg hover:bg-primary-500/10 hover:border-primary-500/40 transition-all"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <textarea
               id="topic"
               required
@@ -581,20 +662,35 @@ export default function CreatePage() {
             </ul>
           </div>
 
-          {/* Example Prompts */}
+          {/* How It Works */}
           <div className="p-6 bg-dark-surface border border-dark-border rounded-lg">
             <h3 className="font-semibold mb-4 flex items-center gap-2 text-lg">
-              ✨ Example Prompts
+              🎬 How It Works
             </h3>
             <ul className="space-y-3 text-gray-400 text-sm">
-              <li className="italic text-primary-300 pl-3 border-l border-primary-500/30">
-                "How do black holes form and what happens at the event horizon"
+              <li className="flex gap-3">
+                <span className="text-primary-400 font-bold">1.</span>
+                <span>
+                  <strong className="text-gray-200">Research:</strong> AI researches your topic for accurate, up-to-date facts
+                </span>
               </li>
-              <li className="italic text-primary-300 pl-3 border-l border-primary-500/30">
-                "The step-by-step journey of a coffee bean from farm to your morning cup"
+              <li className="flex gap-3">
+                <span className="text-primary-400 font-bold">2.</span>
+                <span>
+                  <strong className="text-gray-200">Script:</strong> A narration script is written and reviewed by AI agents
+                </span>
               </li>
-              <li className="italic text-primary-300 pl-3 border-l border-primary-500/30">
-                "Why do we dream? The neuroscience of sleep explained simply"
+              <li className="flex gap-3">
+                <span className="text-primary-400 font-bold">3.</span>
+                <span>
+                  <strong className="text-gray-200">Generate:</strong> Video scenes, voice narration, and captions are created
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-primary-400 font-bold">4.</span>
+                <span>
+                  <strong className="text-gray-200">Assemble:</strong> Everything is stitched into a polished short video
+                </span>
               </li>
             </ul>
           </div>
