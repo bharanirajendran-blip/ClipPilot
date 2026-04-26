@@ -6,6 +6,24 @@ import { useState, useEffect } from 'react'
 import { ProgressSteps } from '@/components/ProgressSteps'
 import { apiClient } from '@/lib/api'
 
+// Map pipeline steps to estimated remaining time
+const getTimeEstimate = (currentStep: string | null): string => {
+  if (!currentStep) return ''
+
+  const step = currentStep.toLowerCase()
+
+  if (step.includes('research')) return '~7-8 min remaining'
+  if (step.includes('script') || step === 'writing script') return '~6-7 min remaining'
+  if (step.includes('review')) return '~5-6 min remaining'
+  if (step.includes('shot') || step.includes('shot list')) return '~4-5 min remaining'
+  if (step.includes('video') || step.includes('generating video')) return '~2-4 min remaining'
+  if (step.includes('audio') || step.includes('tts') || step.includes('generating audio')) return '~1-2 min remaining'
+  if (step.includes('assembl') || step.includes('ffmpeg')) return '~30 sec remaining'
+  if (step.includes('complete') || step.includes('completed')) return 'Done!'
+
+  return ''
+}
+
 const steps = [
   { id: 'research', label: 'Research', icon: '🔍' },
   { id: 'script', label: 'Script', icon: '📝' },
@@ -103,6 +121,15 @@ export default function StatusPage() {
                     style={{ width: `${status.progress}%` }}
                   ></div>
                 </div>
+                {/* Time Estimate */}
+                {getTimeEstimate(status.current_step) && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-gray-500">🕐</span>
+                    <p className="text-xs text-gray-500">
+                      {getTimeEstimate(status.current_step)}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Step Indicators */}
@@ -133,6 +160,9 @@ export default function StatusPage() {
               <p className="text-sm text-gray-400">
                 💡 Our AI is working on your video. This typically takes 2-4
                 minutes. Please keep this page open.
+              </p>
+              <p className="text-xs text-gray-500 mt-3">
+                Times are approximate and vary by topic complexity.
               </p>
             </div>
           )}

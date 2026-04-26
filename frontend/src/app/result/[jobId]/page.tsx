@@ -108,6 +108,29 @@ export default function ResultPage() {
     return <p className="text-gray-300">{String(data)}</p>
   }
 
+  const formatMetrics = (metrics: any): React.ReactNode => {
+    if (!metrics) return null
+
+    if (typeof metrics === 'object' && !Array.isArray(metrics)) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Object.entries(metrics).map(([key, value]) => (
+            <div key={key} className="p-4 bg-dark-surface/50 rounded border border-dark-border">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                {key.replace(/_/g, ' ')}
+              </p>
+              <p className="text-lg font-semibold text-gray-100">
+                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+              </p>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    return formatData(metrics)
+  }
+
   const CollapsibleSection = ({
     title,
     id,
@@ -257,26 +280,36 @@ export default function ResultPage() {
           </div>
         </div>
 
-        {/* Behind the Scenes Section */}
-        {(result.research_data || result.script_data || result.shot_list_data) && (
+        {/* Agent Pipeline Section */}
+        {(result.research_data || result.script_data || result.shot_list_data || result.metrics) && (
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6">Behind the Scenes</h2>
+            <h2 className="text-2xl font-bold mb-6">🤖 Agent Pipeline</h2>
+            <p className="text-gray-400 mb-6">
+              Explore what each AI agent produced during the generation process.
+            </p>
             <div className="space-y-4">
               <CollapsibleSection
-                title="🔬 Research Data"
+                title="🔬 Research Agent"
                 id="research"
                 data={result.research_data}
               />
               <CollapsibleSection
-                title="📝 Script"
+                title="📝 Script Agent"
                 id="script"
                 data={result.script_data}
               />
               <CollapsibleSection
-                title="🎬 Shot List"
+                title="🎬 Shot List Agent"
                 id="shotlist"
                 data={result.shot_list_data}
               />
+              {result.metrics && (
+                <CollapsibleSection
+                  title="📊 Generation Metrics"
+                  id="metrics"
+                  data={formatMetrics(result.metrics)}
+                />
+              )}
             </div>
           </div>
         )}

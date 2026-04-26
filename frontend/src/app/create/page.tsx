@@ -498,14 +498,20 @@ export default function CreatePage() {
           </div>
 
           {/* Audio Section — Record or Upload */}
-          <div>
-            <label className="block text-lg font-semibold mb-4">
-              Your Own Narration (Optional)
+          <div className="opacity-75">
+            <label className="block text-lg font-semibold mb-3 flex items-center gap-2">
+              Custom Narration
+              <span className="inline-block px-2 py-1 bg-gray-500/30 text-gray-300 text-xs font-medium rounded-full">
+                Optional
+              </span>
             </label>
-            <p className="text-gray-400 mb-4 text-sm">
-              Record your voice or upload an audio file. If skipped, AI will generate narration.
+            <p className="text-gray-400 mb-3 text-sm">
+              Optional: Upload your own narration or leave blank for AI-generated voice (ElevenLabs).
             </p>
-            <div className="p-6 bg-dark-surface border border-dark-border rounded-lg">
+            <p className="text-gray-500 mb-4 text-sm">
+              Record your voice or upload an audio file. If skipped, AI will automatically generate professional narration.
+            </p>
+            <div className="p-6 bg-dark-surface/50 border border-dark-border/60 rounded-lg">
               {!audioUrl && !isRecording ? (
                 <div className="flex flex-col sm:flex-row gap-4">
                   {/* Record Button */}
