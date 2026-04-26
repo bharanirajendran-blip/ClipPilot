@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/hooks'
 import { apiClient, Job } from '@/lib/api'
+import { SkeletonDashboard } from '@/components/Skeleton'
 
 export default function DashboardPage() {
   const { user, loading } = useRedirectIfNotAuth()
@@ -42,16 +43,7 @@ export default function DashboardPage() {
   }, [session?.access_token])
 
   if (loading || jobsLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin mb-4">
-            <div className="text-5xl">⚙️</div>
-          </div>
-          <p className="text-gray-400 text-lg">Loading dashboard...</p>
-        </div>
-      </div>
-    )
+    return <SkeletonDashboard />
   }
 
   if (!user) {

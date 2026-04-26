@@ -7,6 +7,27 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 type AuthMode = 'login' | 'register' | 'reset' | 'update-password'
 
+// Helper to map Supabase auth errors to user-friendly messages
+const friendlyError = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error)
+  const messageLower = message.toLowerCase()
+
+  if (messageLower.includes('invalid login credentials') || messageLower.includes('invalid email or password')) {
+    return 'Incorrect email or password. Please try again.'
+  }
+  if (messageLower.includes('user already registered') || messageLower.includes('already exists')) {
+    return 'An account with this email already exists. Try signing in instead.'
+  }
+  if (messageLower.includes('email rate limit') || messageLower.includes('too many')) {
+    return 'Too many attempts. Please wait a few minutes and try again.'
+  }
+  if (messageLower.includes('email not confirmed')) {
+    return 'Please confirm your email address first. Check your inbox.'
+  }
+  // Default fallback without exposing raw error text
+  return 'An error occurred. Please try again.'
+}
+
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
@@ -83,8 +104,7 @@ export default function AuthPage() {
         setConfirmPassword('')
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'An error occurred'
+      const errorMessage = friendlyError(err)
       setError(errorMessage)
     } finally {
       setLoading(false)

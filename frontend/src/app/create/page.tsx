@@ -8,6 +8,27 @@ import { apiClient } from '@/lib/api'
 type StyleType = 'educational' | 'storytelling' | 'explainer' | 'news'
 type DurationType = 30 | 60 | 90
 
+// Helper to map API errors to user-friendly messages
+const friendlyError = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error)
+
+  // Check for HTTP status codes in the error message
+  if (message.includes('429')) {
+    return "You've reached your video limit."
+  }
+  if (message.includes('503') || message.includes('Service Unavailable')) {
+    return 'Our servers are busy. Please try again shortly.'
+  }
+  if (message.includes('network') || message.includes('Network')) {
+    return 'Unable to connect. Please check your internet connection.'
+  }
+  if (message.includes('fetch') || message.includes('Failed to fetch')) {
+    return 'Unable to connect. Please check your internet connection.'
+  }
+  // Default fallback without exposing raw error text
+  return 'Something went wrong. Please try again.'
+}
+
 const StyleCard = ({
   id,
   title,
@@ -43,6 +64,7 @@ export default function CreatePage() {
   const router = useRouter()
 
   const [topic, setTopic] = useState('')
+  const [topicTouched, setTopicTouched] = useState(false)
   const [style, setStyle] = useState<StyleType>('educational')
   const [duration, setDuration] = useState<DurationType>(30)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -91,8 +113,7 @@ export default function CreatePage() {
       const response = await apiClient.uploadAudio(session.access_token, file)
       setAudioUrl(response.audio_url)
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to upload audio'
+      const errorMessage = friendlyError(err)
       setAudioError(errorMessage)
       setAudioFile(null)
     } finally {
@@ -143,8 +164,7 @@ export default function CreatePage() {
           )
           setAudioUrl(response.audio_url)
         } catch (err) {
-          const errorMessage =
-            err instanceof Error ? err.message : 'Failed to upload recording'
+          const errorMessage = friendlyError(err)
           setAudioError(errorMessage)
           setAudioFile(null)
         } finally {
@@ -181,12 +201,28 @@ export default function CreatePage() {
     }
   }, [isRecording])
 
+  const isTopicValid = topic.trim().length >= 10
+  const isTopicTooLong = topic.length > 500
+
+  const handleTopicChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setTopic(e.target.value.slice(0, 500))
+    if (!topicTouched && e.target.value.length > 0) {
+      setTopicTouched(true)
+    }
+  }
+
+  const handleTopicBlur = () => {
+    if (topic.length > 0) {
+      setTopicTouched(true)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
 
-    if (!topic.trim()) {
-      setError('Please enter a topic for your video')
+    if (!topic.trim() || topic.trim().length < 10) {
+      setError('Please enter a topic with at least 10 characters')
       return
     }
 
@@ -213,8 +249,7 @@ export default function CreatePage() {
 
       router.push(`/status/${result.job_id}`)
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to create video'
+      const errorMessage = friendlyError(err)
       setError(errorMessage)
     } finally {
       setIsSubmitting(false)
@@ -280,15 +315,42 @@ export default function CreatePage() {
               required
               disabled={isSubmitting || videosRemaining === 0}
               value={topic}
-              onChange={(e) => setTopic(e.target.value.slice(0, 500))}
+              onChange={handleTopicChange}
+              onBlur={handleTopicBlur}
               placeholder="e.g., The history of artificial intelligence, how photosynthesis works, the benefits of meditation..."
               maxLength={500}
               rows={5}
-              className="input-base resize-none"
+              className={`input-base resize-none transition-colors ${
+                topicTouched && topic.length > 0
+                  ? isTopicValid
+                    ? 'border-green-500/30'
+                    : 'border-red-500/30'
+                  : ''
+              }`}
             />
-            <p className="text-xs text-gray-500 mt-2">
-              {topic.length}/500 characters
-            </p>
+            {/* Validation Message */}
+            {topicTouched && topic.length > 0 && !isTopicValid && (
+              <p className="text-red-400 text-sm mt-2">
+                Topic must be at least 10 characters
+              </p>
+            )}
+            {topicTouched && isTopicValid && (
+              <p className="text-green-400 text-sm mt-2">✓ Valid topic</p>
+            )}
+            {/* Character Counter */}
+            <div className="flex justify-end mt-2">
+              <p
+                className={`text-xs font-mono ${
+                  topicTouched && topic.length > 0
+                    ? topic.length > 450
+                      ? 'text-red-400'
+                      : 'text-gray-500'
+                    : 'text-gray-500'
+                }`}
+              >
+                {topic.length} / 500
+              </p>
+            </div>
           </div>
 
           {/* Style Selection */}
@@ -471,14 +533,16 @@ export default function CreatePage() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting || videosRemaining === 0}
+            disabled={isSubmitting || videosRemaining === 0 || !isTopicValid}
             className="button-primary w-full text-lg py-4"
           >
             {isSubmitting
               ? 'Creating your video...'
               : videosRemaining === 0
                 ? 'No Videos Remaining'
-                : 'Generate Video'}
+                : !isTopicValid
+                  ? 'Enter Valid Topic'
+                  : 'Generate Video'}
           </button>
         </form>
 

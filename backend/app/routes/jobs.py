@@ -45,6 +45,17 @@ def _parse_redis_url(url: str) -> RedisSettings:
     )
 
 
+def _friendly_job_error(error_detail: str) -> str:
+    """Convert technical error messages to user-friendly text."""
+    error_lower = error_detail.lower()
+    if "queue" in error_lower:
+        return "Our servers are busy. Please try again in a few minutes."
+    if "daily limit" in error_lower or "global" in error_lower:
+        return "We've reached our daily video limit. Please try again tomorrow."
+    # Default safe message that doesn't expose internals
+    return "Something went wrong. Please try again."
+
+
 @router.post("", response_model=dict)
 async def create_job(
     request: CreateJobRequest,
@@ -84,7 +95,7 @@ async def create_job(
         if user_video_count >= user_limit:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"You have reached the maximum limit of {user_limit} videos.",
+                detail="You've reached your video limit. Each account can create up to 2 videos.",
             )
         logger.info(f"User {user_id} ({user_email}): {user_video_count}/{user_limit} videos used")
 
@@ -96,7 +107,7 @@ async def create_job(
         if daily_count >= settings.MAX_VIDEOS_PER_DAY_GLOBAL:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Global daily limit reached. Please try again tomorrow.",
+                detail="We've reached our daily video limit. Please try again tomorrow.",
             )
 
         # Create job record
@@ -142,7 +153,7 @@ async def create_job(
             }).eq("id", job_id).execute()
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Job queue is temporarily unavailable. Please try again.",
+                detail="Our servers are busy. Please try again in a few minutes.",
             )
 
         # Increment global daily counter only after successful enqueue
@@ -161,7 +172,7 @@ async def create_job(
         logger.error(f"Job creation failed: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create job: {str(e)}",
+            detail="Something went wrong. Please try again.",
         )
 
 
@@ -350,7 +361,7 @@ async def cancel_job(
         job = response.data
 
         if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
+            raise HTTPException(status_code=404, detail="Video not found.")
 
         if job["user_id"] != user_id:
             raise HTTPException(status_code=403, detail="Not authorized")
@@ -406,7 +417,7 @@ async def delete_job(
         if job["status"] in ("queued", "processing"):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Cannot delete a job that is still running. Cancel it first.",
+                detail="This video is still being generated. Cancel it first before deleting.",
             )
 
         # Delete storage files if they exist (paths match StorageService)

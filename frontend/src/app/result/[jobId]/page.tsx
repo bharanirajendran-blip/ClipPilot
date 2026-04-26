@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { apiClient, JobResultResponse } from '@/lib/api'
 import { useAuth } from '@/lib/hooks'
 import { VideoPlayer } from '@/components/VideoPlayer'
+import { SkeletonVideoResult } from '@/components/Skeleton'
 
 export default function ResultPage() {
   const { user, loading } = useRedirectIfNotAuth()
@@ -141,16 +142,7 @@ export default function ResultPage() {
   }
 
   if (loading || resultLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin mb-4">
-            <div className="text-5xl">⚙️</div>
-          </div>
-          <p className="text-gray-400 text-lg">Loading your video...</p>
-        </div>
-      </div>
-    )
+    return <SkeletonVideoResult />
   }
 
   if (!user || !result) {
