@@ -42,15 +42,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
             settings.SUPABASE_SERVICE_ROLE_KEY,
         )
         logger.info("Supabase client initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase: {str(e)}")
+        raise
 
+    try:
         # Initialize Redis connection
         redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=False)
         redis_client.ping()
         logger.info("Redis connection established")
-
     except Exception as e:
-        logger.error(f"Failed to initialize services: {str(e)}")
-        raise
+        logger.warning(f"Redis not available: {str(e)}. Job queue disabled — API routes still work.")
+        redis_client = None
 
     yield
 
@@ -77,12 +80,14 @@ app = FastAPI(
 
 # Add CORS middleware
 cors_origins = settings.BACKEND_CORS_ORIGINS.split(",")
+if settings.APP_ENV == "development":
+    cors_origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_credentials=True if settings.APP_ENV != "development" else False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
