@@ -404,6 +404,78 @@ class FFmpegService:
                 raise
 
     @staticmethod
+    def add_audio_track(video_bytes: bytes, audio_bytes: bytes, volume: float = 0.45) -> bytes:
+        """Add an audio track to a video that has no existing audio.
+
+        Used when narration is disabled but background music is enabled.
+
+        Args:
+            video_bytes: Video file bytes (no audio track)
+            audio_bytes: Audio file bytes (WAV/MP3)
+            volume: Volume level (0.0-1.0)
+
+        Returns:
+            Video with audio track
+
+        Raises:
+            Exception: If FFmpeg operation fails
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            video_path = os.path.join(tmpdir, "input_video.mp4")
+            audio_path = os.path.join(tmpdir, "music.wav")
+            output_path = os.path.join(tmpdir, "output_with_audio.mp4")
+
+            try:
+                with open(video_path, "wb") as f:
+                    f.write(video_bytes)
+                with open(audio_path, "wb") as f:
+                    f.write(audio_bytes)
+
+                # Get video duration for fade
+                probe_cmd = [FFMPEG_PATH, "-i", video_path, "-f", "null", "-"]
+                probe_result = subprocess.run(probe_cmd, capture_output=True, timeout=30)
+                fade_start = 47
+                stderr_text = probe_result.stderr.decode() if probe_result.stderr else ""
+                dur_match = re.search(r"Duration:\s*(\d+):(\d+):(\d+)\.(\d+)", stderr_text)
+                if dur_match:
+                    h, m, s, _ = dur_match.groups()
+                    total_secs = int(h) * 3600 + int(m) * 60 + int(s)
+                    fade_start = max(0, total_secs - 3)
+
+                cmd = [
+                    FFMPEG_PATH,
+                    "-i", video_path,
+                    "-stream_loop", "-1",
+                    "-i", audio_path,
+                    "-filter_complex",
+                    f"[1:a]volume={volume},afade=t=out:st={fade_start}:d=3[aout]",
+                    "-map", "0:v:0",
+                    "-map", "[aout]",
+                    "-c:v", "copy",
+                    "-c:a", "aac",
+                    "-shortest",
+                    "-y",
+                    output_path,
+                ]
+
+                result = subprocess.run(cmd, capture_output=True, timeout=180)
+                if result.returncode != 0:
+                    error = result.stderr.decode() if result.stderr else "Unknown error"
+                    raise Exception(f"FFmpeg add audio failed: {error}")
+
+                with open(output_path, "rb") as f:
+                    output_bytes = f.read()
+
+                logger.info(f"Added audio track to video: {len(output_bytes)} bytes")
+                return output_bytes
+
+            except subprocess.TimeoutExpired:
+                raise Exception("FFmpeg add audio operation timed out")
+            except Exception as e:
+                logger.error(f"Add audio error: {str(e)}")
+                raise
+
+    @staticmethod
     def get_video_duration(video_bytes: bytes) -> float:
         """Get duration of video in seconds.
 

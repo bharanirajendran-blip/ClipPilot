@@ -65,7 +65,7 @@ def test_settings_cors_origins(test_settings):
 
 def test_settings_model_config(test_settings):
     """Test that Settings can be instantiated as expected."""
-    assert hasattr(test_settings, "Config")
+    assert hasattr(test_settings, "model_config")
     # Verify key environment variables are present
     assert test_settings.SUPABASE_URL
     assert test_settings.ANTHROPIC_API_KEY

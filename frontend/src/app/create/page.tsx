@@ -5,7 +5,7 @@ import { useAuth, useRedirectIfNotAuth } from '@/lib/hooks'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 
-type StyleType = 'educational' | 'storytelling' | 'explainer' | 'news'
+type StyleType = 'educational' | 'storytelling' | 'explainer' | 'documentary' | 'animated'
 type DurationType = 30 | 60 | 90
 
 const topicSuggestions: Record<string, { icon: string; topics: string[] }> = {
@@ -84,6 +84,7 @@ const StyleCard = ({
   onClick: () => void
 }) => (
   <button
+    type="button"
     onClick={onClick}
     className={`p-6 rounded-lg border-2 transition-all text-left ${
       selected
@@ -111,13 +112,13 @@ export default function CreatePage() {
   const [error, setError] = useState<string | null>(null)
   const [videosRemaining, setVideosRemaining] = useState<number | null>(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
-  const [audioFile, setAudioFile] = useState<File | null>(null)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [audioUploading, setAudioUploading] = useState(false)
-  const [audioError, setAudioError] = useState<string | null>(null)
-  const [isRecording, setIsRecording] = useState(false)
-  const [recordingTime, setRecordingTime] = useState(0)
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [musicFile, setMusicFile] = useState<File | null>(null)
+  const [musicUrl, setMusicUrl] = useState<string | null>(null)
+  const [musicUploading, setMusicUploading] = useState(false)
+  const [musicError, setMusicError] = useState<string | null>(null)
+  const [includeNarration, setIncludeNarration] = useState(true)
+  const [includeCaptions, setIncludeCaptions] = useState(true)
+  const [includeMusic, setIncludeMusic] = useState(true)
 
   // Fetch user profile to get videos remaining
   useEffect(() => {
@@ -137,109 +138,35 @@ export default function CreatePage() {
     fetchProfile()
   }, [session?.access_token])
 
-  const handleAudioSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMusicSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setAudioFile(file)
-    setAudioError(null)
-    setAudioUploading(true)
+    setMusicFile(file)
+    setMusicError(null)
+    setMusicUploading(true)
 
     try {
       if (!session?.access_token) {
-        throw new Error('You must be logged in to upload audio')
+        throw new Error('You must be logged in to upload music')
       }
 
-      const response = await apiClient.uploadAudio(session.access_token, file)
-      setAudioUrl(response.audio_url)
+      const response = await apiClient.uploadMusic(session.access_token, file)
+      setMusicUrl(response.music_url)
     } catch (err) {
       const errorMessage = friendlyError(err)
-      setAudioError(errorMessage)
-      setAudioFile(null)
+      setMusicError(errorMessage)
+      setMusicFile(null)
     } finally {
-      setAudioUploading(false)
+      setMusicUploading(false)
     }
   }
 
-  const handleRemoveAudio = () => {
-    setAudioFile(null)
-    setAudioUrl(null)
-    setAudioError(null)
-    setIsRecording(false)
-    setRecordingTime(0)
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop()
-    }
-    setMediaRecorder(null)
+  const handleRemoveMusic = () => {
+    setMusicFile(null)
+    setMusicUrl(null)
+    setMusicError(null)
   }
-
-  const startRecording = async () => {
-    try {
-      setAudioError(null)
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
-      const chunks: BlobPart[] = []
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data)
-      }
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop())
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        const file = new File([blob], `recording-${Date.now()}.webm`, {
-          type: 'audio/webm',
-        })
-
-        setAudioFile(file)
-        setAudioUploading(true)
-
-        try {
-          if (!session?.access_token) {
-            throw new Error('You must be logged in to record audio')
-          }
-          const response = await apiClient.uploadAudio(
-            session.access_token,
-            file
-          )
-          setAudioUrl(response.audio_url)
-        } catch (err) {
-          const errorMessage = friendlyError(err)
-          setAudioError(errorMessage)
-          setAudioFile(null)
-        } finally {
-          setAudioUploading(false)
-        }
-      }
-
-      recorder.start()
-      setMediaRecorder(recorder)
-      setIsRecording(true)
-      setRecordingTime(0)
-    } catch (err) {
-      setAudioError(
-        'Microphone access denied. Please allow microphone access in your browser settings.'
-      )
-    }
-  }
-
-  const stopRecording = () => {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop()
-    }
-    setIsRecording(false)
-  }
-
-  // Recording timer
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null
-    if (isRecording) {
-      timer = setInterval(() => setRecordingTime((t) => t + 1), 1000)
-    }
-    return () => {
-      if (timer) clearInterval(timer)
-    }
-  }, [isRecording])
 
   const isTopicValid = topic.trim().length >= 10
   const isTopicTooLong = topic.length > 500
@@ -284,7 +211,12 @@ export default function CreatePage() {
         topic,
         style,
         duration,
-        audioUrl || undefined
+        {
+          include_narration: includeNarration,
+          include_captions: includeCaptions,
+          include_music: includeMusic,
+          music_url: musicUrl || undefined,
+        }
       )
 
       router.push(`/status/${result.job_id}`)
@@ -465,12 +397,20 @@ export default function CreatePage() {
                 onClick={() => setStyle('explainer')}
               />
               <StyleCard
-                id="news"
-                title="News"
-                description="Quick facts and current events"
-                icon="📰"
-                selected={style === 'news'}
-                onClick={() => setStyle('news')}
+                id="documentary"
+                title="Documentary"
+                description="In-depth exploration with rich visuals"
+                icon="🎥"
+                selected={style === 'documentary'}
+                onClick={() => setStyle('documentary')}
+              />
+              <StyleCard
+                id="animated"
+                title="Animated"
+                description="Colorful cartoon-style visuals, great for abstract topics"
+                icon="🎨"
+                selected={style === 'animated'}
+                onClick={() => setStyle('animated')}
               />
             </div>
           </div>
@@ -497,106 +437,149 @@ export default function CreatePage() {
             </div>
           </div>
 
-          {/* Audio Section — Record or Upload */}
-          <div className="opacity-75">
-            <label className="block text-lg font-semibold mb-3 flex items-center gap-2">
-              Custom Narration
-              <span className="inline-block px-2 py-1 bg-gray-500/30 text-gray-300 text-xs font-medium rounded-full">
-                Optional
-              </span>
-            </label>
-            <p className="text-gray-400 mb-3 text-sm">
-              Optional: Upload your own narration or leave blank for AI-generated voice (ElevenLabs).
-            </p>
-            <p className="text-gray-500 mb-4 text-sm">
-              Record your voice or upload an audio file. If skipped, AI will automatically generate professional narration.
-            </p>
-            <div className="p-6 bg-dark-surface/50 border border-dark-border/60 rounded-lg">
-              {!audioUrl && !isRecording ? (
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {/* Record Button */}
-                  <button
-                    type="button"
-                    onClick={startRecording}
-                    disabled={isSubmitting || audioUploading || videosRemaining === 0}
-                    className="flex-1 flex items-center justify-center gap-3 p-6 border-2 border-dashed border-dark-border rounded-lg hover:border-red-500/50 transition-colors group"
-                  >
-                    <div className="text-center">
-                      <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">🎤</div>
-                      <p className="text-gray-400 font-semibold">Record</p>
-                      <p className="text-xs text-gray-500 mt-1">Use your microphone</p>
-                    </div>
-                  </button>
-
-                  {/* Upload Button */}
-                  <label className="flex-1 flex items-center justify-center gap-3 p-6 border-2 border-dashed border-dark-border rounded-lg cursor-pointer hover:border-primary-500/50 transition-colors group">
-                    <div className="text-center">
-                      <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">📁</div>
-                      <p className="text-gray-400 font-semibold">Upload File</p>
-                      <p className="text-xs text-gray-500 mt-1">MP3, WAV, or M4A</p>
-                    </div>
-                    <input
-                      type="file"
-                      accept=".mp3,.wav,.m4a,.webm"
-                      onChange={handleAudioSelect}
-                      disabled={isSubmitting || audioUploading || videosRemaining === 0}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              ) : isRecording ? (
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-3 mb-4">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                    <span className="text-red-400 font-semibold text-lg">Recording...</span>
-                    <span className="text-gray-400 font-mono">
-                      {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
-                    </span>
-                  </div>
-                  <div className="flex justify-center gap-4">
-                    <button
-                      type="button"
-                      onClick={stopRecording}
-                      className="px-6 py-3 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/30 transition-colors font-semibold"
-                    >
-                      Stop Recording
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleRemoveAudio}
-                      className="px-6 py-3 bg-dark-border/50 border border-dark-border rounded-lg text-gray-400 hover:bg-dark-border transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
+          {/* Audio & Visual Options */}
+          <div>
+            <label className="block text-lg font-semibold mb-4">Audio & Visual Options</label>
+            <div className="space-y-3">
+              {/* Narration Toggle */}
+              <label className="flex items-center justify-between p-4 bg-dark-surface border border-dark-border rounded-lg cursor-pointer hover:border-primary-500/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🎙️</span>
                   <div>
-                    <p className="font-semibold text-gray-200 flex items-center gap-2">
-                      ✓ {audioFile?.name || 'Recording'}
-                    </p>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Audio ready to use
+                    <p className="font-medium text-gray-200">AI Narration</p>
+                    <p className="text-xs text-gray-500">ElevenLabs voiceover for your script</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={includeNarration}
+                  onClick={() => setIncludeNarration(!includeNarration)}
+                  className={`relative w-12 h-7 rounded-full transition-colors ${
+                    includeNarration ? 'bg-primary-500' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${
+                      includeNarration ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </label>
+
+              {/* Captions Toggle */}
+              <label className="flex items-center justify-between p-4 bg-dark-surface border border-dark-border rounded-lg cursor-pointer hover:border-primary-500/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">💬</span>
+                  <div>
+                    <p className="font-medium text-gray-200">Captions</p>
+                    <p className="text-xs text-gray-500">Burned-in subtitles on the video</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={includeCaptions}
+                  onClick={() => setIncludeCaptions(!includeCaptions)}
+                  className={`relative w-12 h-7 rounded-full transition-colors ${
+                    includeCaptions ? 'bg-primary-500' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${
+                      includeCaptions ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </label>
+
+              {/* Music Toggle */}
+              <label className="flex items-center justify-between p-4 bg-dark-surface border border-dark-border rounded-lg cursor-pointer hover:border-primary-500/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🎵</span>
+                  <div>
+                    <p className="font-medium text-gray-200">Background Music</p>
+                    <p className="text-xs text-gray-500">
+                      {includeNarration
+                        ? 'Soft ambient music under narration'
+                        : 'Music-only soundtrack (no voice)'}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleRemoveAudio}
-                    className="px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 hover:bg-red-500/30 transition-colors"
-                  >
-                    Remove
-                  </button>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={includeMusic}
+                  onClick={() => setIncludeMusic(!includeMusic)}
+                  className={`relative w-12 h-7 rounded-full transition-colors ${
+                    includeMusic ? 'bg-primary-500' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${
+                      includeMusic ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </label>
+
+              {/* Custom Music Upload — shown when music is enabled */}
+              {includeMusic && (
+                <div className="ml-10 p-4 bg-dark-surface/50 border border-dark-border/60 rounded-lg">
+                  <p className="text-sm text-gray-400 mb-3">
+                    Upload your own MP3, or leave blank for auto-generated ambient music matched to your style.
+                  </p>
+                  {!musicUrl ? (
+                    <label className="flex items-center justify-center gap-3 p-4 border-2 border-dashed border-dark-border rounded-lg cursor-pointer hover:border-primary-500/50 transition-colors group">
+                      <div className="text-center">
+                        <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">📁</div>
+                        <p className="text-gray-400 font-semibold text-sm">Upload Music</p>
+                        <p className="text-xs text-gray-500 mt-1">MP3, WAV, or M4A</p>
+                      </div>
+                      <input
+                        type="file"
+                        accept=".mp3,.wav,.m4a"
+                        onChange={handleMusicSelect}
+                        disabled={isSubmitting || musicUploading || videosRemaining === 0}
+                        className="hidden"
+                      />
+                    </label>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-200 flex items-center gap-2 text-sm">
+                          ✓ {musicFile?.name || 'Custom music'}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Your music will be used as the background track
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRemoveMusic}
+                        className="px-3 py-1.5 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 text-sm hover:bg-red-500/30 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  {musicUploading && (
+                    <p className="text-center text-gray-400 mt-3 text-sm">
+                      Uploading music...
+                    </p>
+                  )}
+                  {musicError && (
+                    <p className="text-center text-red-400 mt-3 text-sm">
+                      {musicError}
+                    </p>
+                  )}
                 </div>
               )}
-              {audioUploading && (
-                <p className="text-center text-gray-400 mt-3 text-sm">
-                  Uploading audio...
-                </p>
-              )}
-              {audioError && (
-                <p className="text-center text-red-400 mt-3 text-sm">
-                  {audioError}
+
+              {/* Warning when both narration and music are off */}
+              {!includeNarration && !includeMusic && (
+                <p className="text-yellow-400 text-sm px-1">
+                  Your video will have no audio. Consider enabling at least background music.
                 </p>
               )}
             </div>

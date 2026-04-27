@@ -33,6 +33,7 @@ export interface JobResultResponse {
   research_data?: any
   script_data?: any
   shot_list_data?: any
+  metrics?: Record<string, any>
 }
 
 export interface UserProfile {
@@ -50,11 +51,11 @@ const getHeaders = (token: string): HeadersInit => ({
 })
 
 export const apiClient = {
-  async uploadAudio(token: string, file: File): Promise<{ audio_url: string }> {
+  async uploadMusic(token: string, file: File): Promise<{ music_url: string }> {
     const formData = new FormData()
     formData.append('file', file)
 
-    const response = await fetch(`${API_URL}/api/jobs/upload-audio`, {
+    const response = await fetch(`${API_URL}/api/jobs/upload-music`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -64,7 +65,7 @@ export const apiClient = {
 
     if (!response.ok) {
       throw new Error(
-        `Failed to upload audio: ${response.status} ${response.statusText}`
+        `Failed to upload music: ${response.status} ${response.statusText}`
       )
     }
 
@@ -76,16 +77,24 @@ export const apiClient = {
     topic: string,
     style: string,
     duration: number,
-    audio_url?: string
+    options?: {
+      include_narration?: boolean
+      include_captions?: boolean
+      include_music?: boolean
+      music_url?: string
+    }
   ): Promise<{ job_id: string }> {
     const body: any = {
       topic,
       style,
       duration,
+      include_narration: options?.include_narration ?? true,
+      include_captions: options?.include_captions ?? true,
+      include_music: options?.include_music ?? true,
     }
 
-    if (audio_url) {
-      body.audio_url = audio_url
+    if (options?.music_url) {
+      body.music_url = options.music_url
     }
 
     const response = await fetch(`${API_URL}/api/jobs`, {
@@ -175,6 +184,18 @@ export const apiClient = {
         `Failed to cancel job: ${response.status} ${response.statusText}`
       )
     }
+  },
+
+  async getSharedResult(jobId: string): Promise<JobResultResponse> {
+    const response = await fetch(`${API_URL}/api/jobs/${jobId}/share`, {
+      method: 'GET',
+    })
+
+    if (!response.ok) {
+      throw new Error('Video not found or not available')
+    }
+
+    return response.json()
   },
 
   async deleteJob(token: string, jobId: string): Promise<void> {

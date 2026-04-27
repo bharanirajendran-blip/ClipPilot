@@ -37,10 +37,12 @@ cp .env.example .env
 # Copy/paste contents of DATABASE_SCHEMA.sql
 # Execute
 
-# Create storage bucket:
+# Create storage buckets:
 # 1. Go to Storage
-# 2. Create bucket named "videos"
-# 3. Make it public
+# 2. Create bucket named "videos" (public)
+# 3. Create bucket named "audio" (public)
+# 4. Upload mood_calm.mp3, mood_inspiring.mp3, mood_upbeat.mp3,
+#    mood_dramatic.mp3, mood_playful.mp3 to the "audio" bucket
 ```
 
 ### 4. Install Python Dependencies
@@ -97,7 +99,10 @@ curl -X POST http://localhost:8000/api/jobs \
   -d '{
     "topic": "How photosynthesis works",
     "style": "educational",
-    "duration": 30
+    "duration": 30,
+    "include_narration": true,
+    "include_captions": true,
+    "include_music": true
   }'
 ```
 

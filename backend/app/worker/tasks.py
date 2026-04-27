@@ -76,6 +76,10 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
         style = job["style"]
         duration = job["duration"]
         user_id = job["user_id"]
+        include_narration = job.get("include_narration", True)
+        include_captions = job.get("include_captions", True)
+        include_music = job.get("include_music", True)
+        custom_music_url = job.get("music_url")
 
         logger.info(f"Starting job processing: {job_id} for user {user_id}")
 
@@ -105,7 +109,7 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
 
         # Step 3: Review (with up to 2 revision loops)
         review_agent = ReviewAgent()
-        shot_list_agent = ShotListAgent()
+        shot_list_agent = ShotListAgent(style=style)
         revision_count = 0
         max_revisions = 2
 
@@ -120,14 +124,6 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
 
             if review.get("approved", False):
                 logger.info(f"Script approved for {job_id}")
-                # Save script and shot_list data to job record
-                try:
-                    supabase.table("jobs").update({
-                        "script_data": script,
-                        "shot_list_data": shot_list
-                    }).eq("id", job_id).execute()
-                except Exception as e:
-                    logger.warning(f"Failed to save script/shot_list data: {str(e)}")
                 break
 
             if review.get("revision_needed", False) and revision_count < max_revisions - 1:
@@ -157,6 +153,16 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
                 # If not approved after max revisions, log warning but continue
                 logger.warning(f"Script not fully approved for {job_id}, proceeding anyway")
                 break
+
+        # Always save script and shot_list data (even if review didn't approve)
+        try:
+            supabase.table("jobs").update({
+                "script_data": script,
+                "shot_list_data": shot_list,
+                "research_data": research,
+            }).eq("id", job_id).execute()
+        except Exception as e:
+            logger.warning(f"Failed to save agent data: {str(e)}")
 
         # Step 4: Output safety check (hard/soft tiers)
         await _update_job_step(supabase, job_id, "Safety check", 50)
@@ -206,11 +212,18 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
             style_suffix = ", ".join(style_tags) if style_tags else "cinematic, vibrant colors"
             camera_suffix = f", {camera_dir}" if camera_dir else ""
 
-            base_prompt = (
-                f"{runway_prompt}. "
-                f"{style_suffix}, photorealistic 4K quality, professional lighting, "
-                f"smooth cinematic motion{camera_suffix}, vertical format 9:16 aspect ratio"
-            )
+            if style == "animated":
+                base_prompt = (
+                    f"{runway_prompt}. "
+                    f"{style_suffix}, colorful 3D animation, smooth motion, "
+                    f"vibrant cartoon style{camera_suffix}, vertical format 9:16 aspect ratio"
+                )
+            else:
+                base_prompt = (
+                    f"{runway_prompt}. "
+                    f"{style_suffix}, photorealistic 4K quality, professional lighting, "
+                    f"smooth cinematic motion{camera_suffix}, vertical format 9:16 aspect ratio"
+                )
 
             # Tiered retry loop per scene
             scene_success = False
@@ -294,6 +307,16 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
             await _fail_job(supabase, job_id, "Failed to generate any video clips")
             return {"status": "failed", "error": "Video generation failed"}
 
+        # Fail if fewer than half the expected scenes succeeded
+        expected_scenes = len(scenes)
+        actual_scenes = len(video_clip_bytes_list)
+        if actual_scenes < expected_scenes / 2:
+            await _fail_job(
+                supabase, job_id,
+                f"Too many scenes failed: only {actual_scenes}/{expected_scenes} generated. Please try again."
+            )
+            return {"status": "failed", "error": f"Only {actual_scenes}/{expected_scenes} scenes generated"}
+
         # Log vision warnings summary
         if vision_warnings:
             metrics["vision_warnings"] = vision_warnings[:10]  # Cap at 10 for storage
@@ -308,43 +331,19 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
             logger.warning(f"Video concatenation failed: {str(e)}, using first clip only")
             combined_video = video_clip_bytes_list[0]
 
-        # Step 6: Generate narration
-        await _update_job_step(supabase, job_id, "Generating narration", 75)
+        # Step 6: Generate narration (skip if user disabled narration)
+        audio_bytes = None
         narration_text = _extract_narration_text(script)
 
-        # Check if user provided custom audio
-        user_audio_url = job.get("audio_url")
-        if user_audio_url:
-            parsed = urlparse(user_audio_url)
-            supabase_host = urlparse(settings.SUPABASE_URL).hostname
-            trusted_audio_path = "/storage/v1/object/public/audio/"
-
-            # SECURITY: only fetch files from our own public Supabase audio bucket
-            if (
-                parsed.hostname == supabase_host
-                and parsed.path.startswith(trusted_audio_path)
-            ):
-                logger.info(f"Using user-provided audio for {job_id}")
-                try:
-                    with httpx.Client(timeout=60.0) as client:
-                        resp = client.get(user_audio_url)
-                        resp.raise_for_status()
-                        audio_bytes = resp.content
-                    logger.info(f"Downloaded user audio: {len(audio_bytes)} bytes")
-                except Exception as e:
-                    # User explicitly provided audio — fail the job instead of silently switching to AI voice
-                    await _fail_job(supabase, job_id, f"Could not retrieve your uploaded audio: {str(e)}")
-                    return {"status": "failed", "error": "Custom audio download failed"}
-            else:
-                await _fail_job(supabase, job_id, "Uploaded audio URL is invalid. Please re-upload your narration.")
-                return {"status": "failed", "error": "Invalid audio URL"}
-        else:
-            # No custom audio — generate narration via ElevenLabs
+        if include_narration:
+            await _update_job_step(supabase, job_id, "Generating narration", 75)
             audio_bytes = _generate_tts_audio(narration_text, job_id)
+        else:
+            logger.info(f"Narration disabled for {job_id}, skipping TTS")
 
         # Step 7: Transcribe audio for captions via MCP tools/call → Deepgram
         captions_srt = ""
-        if audio_bytes:
+        if audio_bytes and include_captions:
             await _update_job_step(supabase, job_id, "Generating captions", 80)
 
             try:
@@ -352,21 +351,23 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
                 captions_srt = words_to_srt(words, narration_text)
             except Exception as e:
                 logger.warning(f"MCP transcription failed: {str(e)}, continuing without captions")
+        elif not include_captions:
+            logger.info(f"Captions disabled for {job_id}, skipping transcription")
 
         # Step 8: Assemble video with FFmpeg
         await _update_job_step(supabase, job_id, "Assembling video", 85)
 
         final_video = combined_video
 
-        # Combine with audio if available
+        # Combine with narration audio if available
         if audio_bytes:
             try:
                 final_video = ffmpeg_service.combine_video_audio(final_video, audio_bytes)
             except Exception as e:
                 logger.warning(f"Audio combination failed: {str(e)}, using video only")
 
-        # Burn captions if available
-        if captions_srt:
+        # Burn captions if available and enabled
+        if captions_srt and include_captions:
             try:
                 final_video = ffmpeg_service.burn_captions(final_video, captions_srt)
             except Exception as e:
@@ -379,15 +380,43 @@ async def process_video_job(ctx: Any, job_id: str) -> dict:
         except Exception as e:
             logger.warning(f"Disclaimer burn failed: {str(e)}")
 
-        # Add soft background music (only if video has audio)
-        if audio_bytes:
+        # Add background music if enabled
+        if include_music:
             await _update_job_step(supabase, job_id, "Adding background music", 87)
             try:
-                from app.services.music_service import get_background_music
-                music_bytes = get_background_music(style=style, duration=duration)
-                final_video = ffmpeg_service.mix_background_music(
-                    final_video, music_bytes, music_volume=0.12
-                )
+                music_bytes = None
+
+                # Use custom music if user uploaded one
+                if custom_music_url:
+                    parsed = urlparse(custom_music_url)
+                    supabase_host = urlparse(settings.SUPABASE_URL).hostname
+                    trusted_path = "/storage/v1/object/public/audio/"
+
+                    if parsed.hostname == supabase_host and parsed.path.startswith(trusted_path):
+                        logger.info(f"Downloading custom music for {job_id}")
+                        with httpx.Client(timeout=60.0) as client:
+                            resp = client.get(custom_music_url)
+                            resp.raise_for_status()
+                            music_bytes = resp.content
+                        logger.info(f"Custom music downloaded: {len(music_bytes)} bytes")
+                    else:
+                        logger.warning(f"Invalid music URL for {job_id}, falling back to generated")
+
+                # Fall back to generated ambient music
+                if not music_bytes:
+                    from app.services.music_service import get_background_music_sync
+                    music_bytes = get_background_music_sync(style=style, duration=duration)
+
+                if audio_bytes:
+                    # Video has narration — mix music underneath at low volume
+                    final_video = ffmpeg_service.mix_background_music(
+                        final_video, music_bytes, music_volume=0.15
+                    )
+                else:
+                    # No narration — music is the star, play louder
+                    final_video = ffmpeg_service.add_audio_track(
+                        final_video, music_bytes, volume=0.50
+                    )
                 logger.info(f"Added background music for {job_id}")
             except Exception as e:
                 logger.warning(f"Background music failed: {str(e)}, continuing without")

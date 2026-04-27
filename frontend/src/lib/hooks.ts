@@ -133,10 +133,7 @@ export const useJobPolling = (
         )
         setStatus(jobStatus)
         setError(null)
-
-        if (jobStatus.status === 'completed' || jobStatus.status === 'failed') {
-          setLoading(false)
-        }
+        setLoading(false)
       } catch (err) {
         const message =
           err instanceof Error ? err.message : 'Failed to poll job status'

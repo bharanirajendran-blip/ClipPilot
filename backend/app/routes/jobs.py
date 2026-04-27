@@ -121,19 +121,22 @@ async def create_job(
             "status": "queued",
             "progress": 0,
             "current_step": "Queued",
+            "include_narration": request.include_narration,
+            "include_captions": request.include_captions,
+            "include_music": request.include_music,
         }
 
-        if request.audio_url:
-            # Validate audio URL points to our Supabase storage
+        if request.music_url:
+            # Validate music URL points to our Supabase storage
             from urllib.parse import urlparse
-            parsed_audio = urlparse(request.audio_url)
+            parsed_music = urlparse(request.music_url)
             supabase_host = urlparse(settings.SUPABASE_URL).hostname
-            if not (parsed_audio.hostname == supabase_host):
+            if not (parsed_music.hostname == supabase_host):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Audio URL must be from our storage. Please upload via the audio upload button.",
+                    detail="Music URL must be from our storage. Please upload via the music upload button.",
                 )
-            job_data["audio_url"] = request.audio_url
+            job_data["music_url"] = request.music_url
 
         supabase.table("jobs").insert(job_data).execute()
         logger.info(f"Created job: {job_id}")
@@ -246,13 +249,13 @@ async def get_job_result(
         raise HTTPException(status_code=500, detail="Failed to get job result")
 
 
-@router.post("/upload-audio")
-async def upload_audio(
+@router.post("/upload-music")
+async def upload_music(
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user),
     supabase=Depends(get_supabase),
 ) -> dict:
-    """Upload custom audio file to Supabase Storage."""
+    """Upload custom background music file to Supabase Storage."""
     try:
         # Validate file type
         allowed_types = {"audio/mpeg", "audio/wav", "audio/mp4", "audio/webm", "audio/ogg"}
@@ -277,19 +280,19 @@ async def upload_audio(
         file_ext = file.filename.split(".")[-1] if file.filename else "mp3"
         unique_filename = f"{user_id}/{uuid.uuid4()}.{file_ext}"
 
-        # Upload to Supabase Storage
+        # Upload to Supabase Storage (audio bucket)
         response = supabase.storage.from_("audio").upload(
             unique_filename,
             file_content,
             {"content-type": file.content_type}
         )
-        logger.info(f"Uploaded audio file: {unique_filename}")
+        logger.info(f"Uploaded music file: {unique_filename}")
 
         # Get public URL
-        audio_url = supabase.storage.from_("audio").get_public_url(unique_filename)
+        music_url = supabase.storage.from_("audio").get_public_url(unique_filename)
 
         return {
-            "audio_url": audio_url,
+            "music_url": music_url,
             "filename": file.filename,
             "size": len(file_content),
         }
@@ -297,10 +300,10 @@ async def upload_audio(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Audio upload failed: {str(e)}", exc_info=True)
+        logger.error(f"Music upload failed: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Audio upload failed: {str(e)}"
+            detail=f"Music upload failed: {str(e)}"
         )
 
 
@@ -429,15 +432,15 @@ async def delete_job(
         except Exception as e:
             logger.warning(f"Failed to delete storage files: {str(e)}")
 
-        # Delete uploaded audio if it exists
-        if job.get("audio_url"):
+        # Delete uploaded music if it exists
+        if job.get("music_url"):
             try:
                 from urllib.parse import urlparse
-                audio_path = urlparse(job["audio_url"]).path.split("/audio/")[-1]
-                if audio_path:
-                    supabase.storage.from_("audio").remove([audio_path])
+                music_path = urlparse(job["music_url"]).path.split("/audio/")[-1]
+                if music_path:
+                    supabase.storage.from_("audio").remove([music_path])
             except Exception as e:
-                logger.warning(f"Failed to delete audio file: {str(e)}")
+                logger.warning(f"Failed to delete music file: {str(e)}")
 
         # Delete job record
         supabase.table("jobs").delete().eq("id", job_id).execute()
@@ -450,3 +453,36 @@ async def delete_job(
     except Exception as e:
         logger.error(f"Failed to delete job: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to delete job")
+
+
+@router.get("/{job_id}/share")
+async def get_shared_result(
+    job_id: str,
+    supabase=Depends(get_supabase),
+) -> dict:
+    """Get public share data for a completed video. No auth required."""
+    try:
+        response = supabase.table("jobs").select(
+            "video_url, thumbnail_url, title, description, tags, status"
+        ).eq("id", job_id).single().execute()
+        job = response.data
+
+        if not job:
+            raise HTTPException(status_code=404, detail="Video not found")
+
+        if job["status"] != "completed":
+            raise HTTPException(status_code=404, detail="Video not available")
+
+        return {
+            "video_url": job.get("video_url", ""),
+            "thumbnail_url": job.get("thumbnail_url", ""),
+            "title": job.get("title", "Untitled"),
+            "description": job.get("description", ""),
+            "tags": job.get("tags", []),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get shared result: {str(e)}")
+        raise HTTPException(status_code=404, detail="Video not found")

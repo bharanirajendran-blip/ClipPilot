@@ -332,8 +332,12 @@ Core models:
 ```python
 CreateJobRequest:
   - topic: str
-  - style: enum(educational, storytelling, explainer, news)
-  - duration: enum(30, 60)
+  - style: enum(educational, storytelling, explainer, documentary, animated)
+  - duration: enum(30, 60, 90)
+  - include_narration: bool (default true)
+  - include_captions: bool (default true)
+  - include_music: bool (default true)
+  - music_url: str | null (custom background music from Supabase Storage)
 
 JobStatusResponse:
   - job_id: str

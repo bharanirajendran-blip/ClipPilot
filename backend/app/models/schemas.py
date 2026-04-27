@@ -1,6 +1,6 @@
 """Pydantic models for request/response validation."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from enum import Enum
 from typing import Optional, List
 from datetime import datetime
@@ -11,7 +11,8 @@ class StyleEnum(str, Enum):
     educational = "educational"
     storytelling = "storytelling"
     explainer = "explainer"
-    news = "news"
+    documentary = "documentary"
+    animated = "animated"
 
 
 class DurationEnum(int, Enum):
@@ -23,23 +24,40 @@ class DurationEnum(int, Enum):
 
 class CreateJobRequest(BaseModel):
     """Request to create a new video generation job."""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "topic": "How solar panels convert sunlight into electricity",
+            "style": "educational",
+            "duration": 30,
+            "include_narration": True,
+            "include_captions": True,
+            "include_music": True
+        }
+    })
+
     topic: str = Field(..., min_length=3, max_length=500, description="Topic for the video")
     style: StyleEnum = Field(default=StyleEnum.educational, description="Video style")
     duration: DurationEnum = Field(default=DurationEnum.thirty, description="Video duration in seconds")
-    audio_url: Optional[str] = None
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "topic": "How solar panels convert sunlight into electricity",
-                "style": "educational",
-                "duration": 30
-            }
-        }
+    music_url: Optional[str] = Field(default=None, description="Custom background music URL from Supabase Storage")
+    include_narration: bool = Field(default=True, description="Include AI voiceover narration")
+    include_captions: bool = Field(default=True, description="Include burned-in captions/subtitles")
+    include_music: bool = Field(default=True, description="Include background music")
 
 
 class JobStatusResponse(BaseModel):
     """Response for job status."""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "job_id": "job_123abc",
+            "status": "processing",
+            "progress": 45,
+            "current_step": "Generating video",
+            "created_at": "2024-04-21T10:00:00Z",
+            "updated_at": "2024-04-21T10:02:30Z",
+            "error_message": None
+        }
+    })
+
     job_id: str
     status: str
     progress: int = Field(default=0, ge=0, le=100)
@@ -48,22 +66,25 @@ class JobStatusResponse(BaseModel):
     updated_at: datetime
     error_message: Optional[str] = None
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "job_id": "job_123abc",
-                "status": "processing",
-                "progress": 45,
-                "current_step": "Generating video",
-                "created_at": "2024-04-21T10:00:00Z",
-                "updated_at": "2024-04-21T10:02:30Z",
-                "error_message": None
-            }
-        }
-
 
 class JobResultResponse(BaseModel):
     """Response for completed job with video result."""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "job_id": "job_123abc",
+            "status": "completed",
+            "video_url": "https://bucket.com/videos/job_123abc/video.mp4",
+            "thumbnail_url": "https://bucket.com/videos/job_123abc/thumb.png",
+            "title": "Solar Power Explained",
+            "description": "Learn how solar panels work",
+            "tags": ["energy", "science", "renewable"],
+            "category": "educational",
+            "created_at": "2024-04-21T10:00:00Z",
+            "completed_at": "2024-04-21T10:15:00Z",
+            "metadata": {}
+        }
+    })
+
     job_id: str
     status: str
     video_url: str
@@ -76,26 +97,20 @@ class JobResultResponse(BaseModel):
     completed_at: Optional[datetime] = None
     metadata: dict = Field(default_factory=dict)
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "job_id": "job_123abc",
-                "status": "completed",
-                "video_url": "https://bucket.com/videos/job_123abc/video.mp4",
-                "thumbnail_url": "https://bucket.com/videos/job_123abc/thumb.png",
-                "title": "Solar Power Explained",
-                "description": "Learn how solar panels work",
-                "tags": ["energy", "science", "renewable"],
-                "category": "educational",
-                "created_at": "2024-04-21T10:00:00Z",
-                "completed_at": "2024-04-21T10:15:00Z",
-                "metadata": {}
-            }
-        }
-
 
 class UserProfile(BaseModel):
     """User profile information."""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "user_id": "user_123",
+            "email": "user@example.com",
+            "videos_created": 1,
+            "videos_remaining": 1,
+            "created_at": "2024-04-20T12:00:00Z",
+            "updated_at": "2024-04-21T10:00:00Z"
+        }
+    })
+
     user_id: str
     email: str
     videos_created: int
@@ -103,45 +118,31 @@ class UserProfile(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "user_id": "user_123",
-                "email": "user@example.com",
-                "videos_created": 1,
-                "videos_remaining": 1,
-                "created_at": "2024-04-20T12:00:00Z",
-                "updated_at": "2024-04-21T10:00:00Z"
-            }
-        }
-
 
 class HealthResponse(BaseModel):
     """Health check response."""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "status": "ok",
+            "version": "1.0.0"
+        }
+    })
+
     status: str
     version: str
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "status": "ok",
-                "version": "1.0.0"
-            }
-        }
 
 
 class JobListResponse(BaseModel):
     """List of user jobs."""
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "jobs": [],
+            "total": 0
+        }
+    })
+
     jobs: List[JobStatusResponse]
     total: int
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "jobs": [],
-                "total": 0
-            }
-        }
 
 
 class GuardrailResult(BaseModel):

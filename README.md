@@ -87,7 +87,7 @@ MCP tools available at `GET /mcp/tools`:
 | Narration | ElevenLabs Turbo v2.5 |
 | Captions | Deepgram Nova-2 |
 | Assembly | FFmpeg (bundled via imageio-ffmpeg) |
-| Background Music | Pure Python ambient generator (no API cost) |
+| Background Music | Royalty-free MP3 tracks from Supabase Storage (5 mood-matched) |
 
 ## Safety and Guardrails
 
@@ -257,9 +257,9 @@ docker-compose up --build
 
 1. Go to `http://localhost:3000` and sign up with email/password
 2. Click "Create" and enter a topic (be specific for best results)
-3. Choose a style (educational, storytelling, explainer, news)
-4. Choose duration (30 or 50 seconds)
-5. Optionally record narration with the mic button or upload an audio file
+3. Choose a style (educational, storytelling, explainer, documentary, animated)
+4. Choose duration (30, 60, or 90 seconds)
+5. Toggle narration, captions, and background music on/off; optionally upload your own MP3
 6. Click "Generate Video" and wait (~2-5 minutes)
 7. View and download your completed video on the result page
 
@@ -284,7 +284,8 @@ docker-compose up --build
 | GET | `/api/jobs/{id}/result` | Get completed video URL + metadata + metrics |
 | POST | `/api/jobs/{id}/cancel` | Cancel a running or queued job |
 | DELETE | `/api/jobs/{id}` | Delete a completed/failed job |
-| POST | `/api/jobs/upload-audio` | Upload custom narration audio |
+| POST | `/api/jobs/upload-music` | Upload custom background music (MP3/WAV/M4A) |
+| GET | `/api/jobs/{id}/share` | Public share endpoint (no auth required) |
 
 ### MCP Endpoints
 

@@ -1,6 +1,6 @@
 """Application configuration using Pydantic Settings."""
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
@@ -53,9 +53,10 @@ class Settings(BaseSettings):
     ELEVENLABS_VOICE_ID: str = "21m00Tcm4TlvDq8ikWAM"  # Rachel voice
     ELEVENLABS_MODEL_ID: str = "eleven_turbo_v2_5"
 
-    class Config:
-        env_file = ("../.env", ".env")
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=("../.env", ".env"),
+        case_sensitive=True,
+    )
 
 
 def get_settings() -> Settings:

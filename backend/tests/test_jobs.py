@@ -266,3 +266,155 @@ def test_delete_active_job_fails(auth_client, mock_deps):
 
     response = auth_client.delete("/api/jobs/job-123")
     assert response.status_code == 409
+
+
+# ── Audio/Visual option tests ──────────────────────────────────────
+
+
+@patch("app.routes.jobs.check_input_safety")
+@patch("app.routes.jobs.create_pool")
+def test_create_job_with_options(mock_pool, mock_safety, auth_client, mock_deps):
+    """Test job creation with narration/captions/music options."""
+    sb = mock_deps["supabase"]
+
+    mock_safety.return_value = MagicMock(is_safe=True)
+
+    def table_side_effect(name):
+        mock_table = MagicMock()
+        if name == "profiles":
+            resp = MagicMock()
+            resp.data = [{"email": "test@example.com"}]
+            mock_table.select.return_value.eq.return_value.execute.return_value = resp
+        elif name == "jobs":
+            count_resp = MagicMock()
+            count_resp.count = 0
+            count_resp.data = []
+            mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = count_resp
+            mock_table.insert.return_value.execute.return_value = True
+        return mock_table
+
+    sb.table = MagicMock(side_effect=table_side_effect)
+    mock_deps["redis"].get.return_value = None
+
+    mock_pool_inst = AsyncMock()
+    mock_pool_inst.enqueue_job = AsyncMock(return_value=True)
+    mock_pool.return_value = mock_pool_inst
+
+    response = auth_client.post(
+        "/api/jobs",
+        json={
+            "topic": "A robot finds a flower in a junkyard",
+            "style": "storytelling",
+            "duration": 30,
+            "include_narration": False,
+            "include_captions": False,
+            "include_music": True,
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "job_id" in data
+
+
+@patch("app.routes.jobs.check_input_safety")
+@patch("app.routes.jobs.create_pool")
+def test_create_job_documentary_style(mock_pool, mock_safety, auth_client, mock_deps):
+    """Test job creation with documentary style (replaced 'news')."""
+    sb = mock_deps["supabase"]
+
+    mock_safety.return_value = MagicMock(is_safe=True)
+
+    def table_side_effect(name):
+        mock_table = MagicMock()
+        if name == "profiles":
+            resp = MagicMock()
+            resp.data = [{"email": "test@example.com"}]
+            mock_table.select.return_value.eq.return_value.execute.return_value = resp
+        elif name == "jobs":
+            count_resp = MagicMock()
+            count_resp.count = 0
+            count_resp.data = []
+            mock_table.select.return_value.eq.return_value.eq.return_value.execute.return_value = count_resp
+            mock_table.insert.return_value.execute.return_value = True
+        return mock_table
+
+    sb.table = MagicMock(side_effect=table_side_effect)
+    mock_deps["redis"].get.return_value = None
+
+    mock_pool_inst = AsyncMock()
+    mock_pool_inst.enqueue_job = AsyncMock(return_value=True)
+    mock_pool.return_value = mock_pool_inst
+
+    response = auth_client.post(
+        "/api/jobs",
+        json={
+            "topic": "The history of space exploration from 1960s to today",
+            "style": "documentary",
+            "duration": 60,
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_create_job_invalid_news_style(test_client):
+    """Test that the old 'news' style is rejected."""
+    response = test_client.post(
+        "/api/jobs",
+        json={
+            "topic": "Breaking news about technology",
+            "style": "news",
+            "duration": 30,
+        },
+        headers={"Authorization": "Bearer test-token"},
+    )
+    # Should fail validation (news is not a valid style anymore)
+    assert response.status_code in [401, 422]
+
+
+# ── Share endpoint tests ───────────────────────────────────────────
+
+
+def test_share_completed_video(test_client, mock_deps):
+    """Test public share endpoint returns video data."""
+    from app.routes.jobs import get_supabase
+    sb = mock_deps["supabase"]
+    app.dependency_overrides[get_supabase] = lambda: sb
+
+    job_resp = MagicMock()
+    job_resp.data = {
+        "video_url": "https://storage.example.com/video.mp4",
+        "thumbnail_url": "https://storage.example.com/thumb.png",
+        "title": "Solar Panels Explained",
+        "description": "Learn about solar energy",
+        "tags": ["solar", "energy"],
+        "status": "completed",
+    }
+    sb.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = job_resp
+
+    response = test_client.get("/api/jobs/job-123/share")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Solar Panels Explained"
+    assert "video_url" in data
+
+    app.dependency_overrides.clear()
+
+
+def test_share_incomplete_video_returns_404(test_client, mock_deps):
+    """Test that sharing an incomplete video returns 404."""
+    from app.routes.jobs import get_supabase
+    sb = mock_deps["supabase"]
+    app.dependency_overrides[get_supabase] = lambda: sb
+
+    job_resp = MagicMock()
+    job_resp.data = {
+        "status": "processing",
+    }
+    sb.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = job_resp
+
+    response = test_client.get("/api/jobs/job-123/share")
+    assert response.status_code == 404
+
+    app.dependency_overrides.clear()

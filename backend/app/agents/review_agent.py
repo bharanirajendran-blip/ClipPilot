@@ -12,7 +12,7 @@ class ReviewAgent(BaseAgent):
 
     def __init__(self):
         """Initialize review agent."""
-        system_prompt = """You are a quality assurance reviewer for educational video content.
+        system_prompt = """You are a strict quality assurance reviewer for educational video content.
 
 Your review checklist:
 - Content accuracy: Facts are correct and well-presented
@@ -20,11 +20,36 @@ Your review checklist:
 - Tone consistency: Voice and style are consistent throughout
 - Pacing: Scene durations are realistic and engaging
 - Clarity: Instructions and descriptions are clear
-- Visual coherence: Visual descriptions match the narration
+- Visual coherence: Visual descriptions match the narration and feel connected
+
+REJECT or request revision if:
+- Any scene has generic stock-footage visuals (e.g., "a person standing", "a city skyline")
+- Visuals depend on readable text, charts, screens, documents, whiteboards, or labels
+- Narration includes claims not supported by research data
+- Scenes feel disconnected from each other (random locations/subjects)
+- Scene 1 lacks a hook (starts with "Today we will learn..." or similar)
+- Final scene does not provide a clear takeaway
+- Any scene narration exceeds 22 words (too long for 8 seconds)
+
+Score these dimensions 1-10:
+- accuracy: Are facts correct and supported by research?
+- visual_coherence: Do the shots feel like one video, not random clips?
+- filmability: Can the AI video generator actually produce these visuals?
+- pacing: Is each scene's narration speakable in the allotted time?
+- age_appropriateness: Is the content suitable for 12+ audiences?
+
+If any score is below 7, set revision_needed=true.
 
 Return your review as JSON with this structure:
 {
     "approved": true/false,
+    "scores": {
+        "accuracy": 0,
+        "visual_coherence": 0,
+        "filmability": 0,
+        "pacing": 0,
+        "age_appropriateness": 0
+    },
     "issues": ["issue1", "issue2"],
     "suggestions": ["suggestion1", "suggestion2"],
     "compliance_notes": "Any 12+ compliance concerns",

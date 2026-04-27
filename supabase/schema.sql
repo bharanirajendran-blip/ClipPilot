@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.jobs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     topic TEXT NOT NULL,
-    style TEXT NOT NULL CHECK (style IN ('educational', 'storytelling', 'explainer', 'news')),
+    style TEXT NOT NULL CHECK (style IN ('educational', 'storytelling', 'explainer', 'documentary', 'animated')),
     duration INTEGER NOT NULL CHECK (duration IN (30, 60, 90)),
     status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
     progress INTEGER DEFAULT 0 NOT NULL CHECK (progress >= 0 AND progress <= 100),
@@ -47,7 +47,10 @@ CREATE TABLE IF NOT EXISTS public.jobs (
     research_data JSONB,
     script_data JSONB,
     shot_list_data JSONB,
-    audio_url TEXT,
+    music_url TEXT,
+    include_narration BOOLEAN DEFAULT TRUE NOT NULL,
+    include_captions BOOLEAN DEFAULT TRUE NOT NULL,
+    include_music BOOLEAN DEFAULT TRUE NOT NULL,
     metrics JSONB,
     error_message TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
@@ -121,10 +124,6 @@ ON CONFLICT (id) DO NOTHING;
 CREATE POLICY "Public video access"
     ON storage.objects FOR SELECT
     USING (bucket_id = 'videos');
-
-CREATE POLICY "Public audio access"
-    ON storage.objects FOR SELECT
-    USING (bucket_id = 'audio');
 
 CREATE POLICY "Public audio access"
     ON storage.objects FOR SELECT

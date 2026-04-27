@@ -187,12 +187,14 @@ Response:
 ### Durations Supported
 - 30 seconds
 - 60 seconds
+- 90 seconds
 
 ### Styles
 - `educational` - Educational/tutorial
 - `storytelling` - Narrative-driven
 - `explainer` - How-it-works
-- `news` - News/update style
+- `documentary` - In-depth exploration with rich visuals
+- `animated` - Colorful cartoon-style, great for abstract topics
 
 ### Content Safety
 Blocked categories (12+ enforcement):

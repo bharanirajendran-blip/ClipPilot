@@ -15,12 +15,12 @@ class MetadataAgent(BaseAgent):
         system_prompt = """You are a video metadata specialist creating titles, descriptions, and tags for educational content.
 
 Your metadata should:
-- Create engaging, accurate titles (40-60 characters)
-- Write SEO-friendly descriptions (100-150 characters)
-- Suggest 5-8 relevant tags for discoverability
-- Categorize content appropriately
-- Appeal to the 12+ audience
-- Be suitable for social media sharing
+- Create engaging, accurate titles (40-60 characters) — titles must be specific to the actual content, not generic. Avoid exaggerated clickbait.
+- Write SEO-friendly descriptions (100-150 characters) — descriptions should mention the actual learning outcome, not just the topic.
+- Suggest 5-8 relevant tags — tags should be lowercase, short, and platform-friendly (e.g., "solar energy" not "Solar Energy Science Topic").
+- Categorize content appropriately.
+- Appeal to the 12+ audience.
+- Be suitable for social media sharing.
 
 Return your metadata as JSON with this structure:
 {

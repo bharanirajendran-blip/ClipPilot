@@ -34,13 +34,16 @@ temp/
 # Logs
 *.log
 
-# Generated videos (demo files, don't commit)
+# Generated videos & media (demo files, don't commit)
 *.mp4
 *.wav
 *.mp3
+*.jpg
+*.png
 
 # Google Cloud credentials
 *.json
 !package.json
 !package-lock.json
 !tsconfig.json
+*.download

@@ -2,7 +2,7 @@
 
 import { useRedirectIfNotAuth } from '@/lib/hooks'
 import { useRouter, useParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { apiClient, JobResultResponse } from '@/lib/api'
 import { useAuth } from '@/lib/hooks'
 import { VideoPlayer } from '@/components/VideoPlayer'
@@ -66,7 +66,7 @@ export default function ResultPage() {
   }
 
   const handleShare = () => {
-    const url = `${window.location.origin}/result/${jobId}`
+    const url = `${window.location.origin}/share/${jobId}`
     navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -157,7 +157,7 @@ export default function ResultPage() {
         </button>
         {isExpanded && (
           <div className="p-4 bg-dark-surface/50 border-t border-dark-border">
-            {formatData(data)}
+            {React.isValidElement(data) ? data : formatData(data)}
           </div>
         )}
       </div>
