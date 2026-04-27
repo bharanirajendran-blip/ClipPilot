@@ -71,8 +71,8 @@ Return your script as JSON with this structure:
 
         Args:
             topic: Video topic
-            style: Video style (educational, storytelling, explainer, news)
-            duration: Target duration in seconds (30 or 50)
+            style: Video style (educational, storytelling, explainer, documentary, animated)
+            duration: Target duration in seconds (30, 60, or 90)
             research: Research data from research agent
             revision_feedback: Optional feedback from the review agent for revisions
 
