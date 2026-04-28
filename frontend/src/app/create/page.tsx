@@ -64,6 +64,10 @@ const friendlyError = (error: unknown): string => {
   if (message.includes('fetch') || message.includes('Failed to fetch')) {
     return 'Unable to connect. Please check your internet connection.'
   }
+  // Show content safety rejections clearly
+  if (message.includes('safety') || message.includes('Content rejected') || message.includes('not appropriate')) {
+    return message
+  }
   // Default fallback without exposing raw error text
   return 'Something went wrong. Please try again.'
 }

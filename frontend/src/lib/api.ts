@@ -104,9 +104,9 @@ export const apiClient = {
     })
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to create job: ${response.status} ${response.statusText}`
-      )
+      const errorData = await response.json().catch(() => null)
+      const detail = errorData?.detail || `${response.status} ${response.statusText}`
+      throw new Error(detail)
     }
 
     return response.json()
